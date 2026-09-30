@@ -25,9 +25,9 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+
+My search is a plain keyword match, so some phrasings will miss — that's why
+4 of 5, not 5 of 5.
 
 ---
 
@@ -37,26 +37,25 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+
+This path is a deterministic code branch — it doesn't call the model and
+isn't subject to model randomness — so it can be held to 5 of 5, unlike
+criterion 1.
 
 ---
 
 ## 3. Something about state
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+Given a completed run, the `id` of the listing `search_listings` selected as
+its first result matches the `id` of the `new_item` actually passed into
+`suggest_outfit` — in 5 of 5 tries.
 
 **Why this target:**
+
+Passing the selected item into `suggest_outfit` is a deterministic assignment
+through session state, not a model call — there is no legitimate source of
+variance here. A mismatch can only be a bug, not acceptable error, so this
+must be 5 of 5.
 
 
 
@@ -64,20 +63,19 @@ Given a query that matches no listings, the agent stops before calling
 
 ## 4. Something about the fit card
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+Given 5 generated fit cards for different items: (a) each one mentions the
+item's price and its platform at least once — 5 of 5; and (b) comparing all
+10 pairs of opening sentences across the 5 outputs, at most 1 pair is
+identical — 9 of 10 pairs distinct.
 
 **Why this target:**
+
+`TEMPERATURE` is 0.9 (not 0), so the output is intentionally non-deterministic
+— occasionally generating a similar-sounding opening by chance is expected and
+shouldn't be over-penalized, but heavy repetition would still be a problem,
+hence one pair of tolerance. Mentioning price and platform, however, is a
+prompt-following instruction, not stylistic variance, so those must hold 5 of
+5.
 
 
 
@@ -85,16 +83,13 @@ Given a query that matches no listings, the agent stops before calling
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+Given a query with an explicit `max_price`, the price of `selected_item`
+is less than or equal to `max_price` — in 5 of 5 tries.
 
 **Why this target:**
+
+Ignoring the price ceiling makes the recommendation entirely invalid to the
+user — there is no acceptable rate of failure here, so this has to be 5 of 5.
 
 
 

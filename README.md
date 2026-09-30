@@ -59,24 +59,31 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Filters the 40 listings in `data/listings.json` by size and price ceiling, then ranks the survivors by keyword overlap with the description.
+- **Inputs:**
+  - `description` (str) — free-text keywords, e.g. `"vintage graphic tee"`
+  - `size` (str | None) — a size token to filter by, case-insensitive, whole-token match against the listing's `size` field (split on whitespace) rather than substring — so `"M"` matches `"S/M"` but `"S"` does not match `"US 9"`, and `"L"` does not match `"XL"`
+  - `max_price` (float | None) — inclusive price ceiling
+- **Returns:** A list of listing dicts, best match first, each with `id, title, description, category, style_tags, size, condition, price, colors, brand, platform` — capped at `config.SEARCH_RESULT_LIMIT` (10) results.
+- **When it has nothing:** Returns `[]` (empty list) — never `None`, never raises. This is the value the loop's branch checks.
 
 ### `suggest_outfit`
 
-- **What it does:**
+- **What it does:** Calls the model to suggest one or two outfits pairing a candidate listing with the user's existing wardrobe.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `new_item` (dict) — a listing dict, as returned by `search_listings`
+  - `wardrobe` (dict) — `{"items": [...]}`; `items` may be `[]`
+- **Returns:** A non-empty string of outfit suggestions. If `wardrobe["items"]` is empty, returns general styling advice for the item instead of naming pieces the user doesn't have.
+- **When it has nothing:** There is no "nothing" return here — an empty wardrobe still produces a non-empty string (general advice, not `""` and not an exception).
 
 ### `create_fit_card`
 
-- **What it does:**
+- **What it does:** Calls the model to write a 2–4 sentence social-post-style caption for the item, using the outfit suggestion as context.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `outfit` (str) — the string returned by `suggest_outfit`
+  - `new_item` (dict) — the listing dict for the item
+- **Returns:** A 2–4 sentence caption string that mentions the item, its price, and its platform once each.
+- **When it has nothing:** If `outfit` is empty or whitespace-only, returns a descriptive message string (not `""`, not an exception) instead of calling the model.
 
 ---
 
@@ -93,13 +100,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` telling the user what to change (e.g. loosen the price or size) and stop — do not call `suggest_outfit`. Otherwise, take the first result as `session["selected_item"]` and continue to `suggest_outfit`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex over the raw query string — one pattern pulls a size token (e.g. `\b(XS|S|M|L|XL|XXL|W?\d{2}(?:\s?L\d{2})?)\b`), another pulls a max price from `under $N` / `$N or less` phrasing, and whatever text remains (with those matched spans stripped) becomes `description`.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` → `parsed` (description/size/max_price) → `search_results` → `selected_item` → `outfit_suggestion` → `fit_card`, with `error` set and the run stopped short the moment any step can't produce a usable next input.
 
 ---
 
@@ -112,6 +119,8 @@
 
 **One full query**
 
+<!-- Filled in once the loop in agent.py is built — Milestone 5. -->
+
 ```
 $ python app.py ask '...'
 
@@ -121,17 +130,35 @@ $ python app.py ask '...'
 
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', ... 'price': 18.0, ...},
+ {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', ... 'price': 24.0, ...},
+ {'id': 'lst_017', 'title': 'Mesh Long-Sleeve Top — Black', ... 'price': 15.0, ...},
+ {'id': 'lst_033', 'title': 'Vintage Band Tee — Faded Grey', ... 'price': 19.0, ...},
+ ... 8 results total, all ≤ $30]
 
+$ python -c "from tools import search_listings; print(search_listings('designer ballgown', size='XXS', max_price=5))"
+[]
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "
+from tools import suggest_outfit
+from utils.data_loader import get_example_wardrobe, load_listings
+print(suggest_outfit(load_listings()[0], get_example_wardrobe()))
+"
+**Outfit 1:** Pair the vintage Levi's 501 jeans with the white ribbed tank top and chunky white sneakers for a classic, effortless 90s streetwear look. Add the black crossbody bag to complete the everyday casual vibe.
 
+**Outfit 2:** Layer the oversized grey crewneck sweatshirt over the jeans, and ground the fit with the black combat boots. Accessorize with the brown leather belt for a subtle touch of contrast and structure.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
-
+$ python -c "
+from tools import create_fit_card
+from utils.data_loader import load_listings
+item = load_listings()[0]
+print(create_fit_card('Pair with a white tank top and chunky sneakers for an effortless look.', item))
+"
+Finally scored the holy grail of denim on Depop and I am never taking these off. These vintage Levi's 501s have the absolute best lived-in fade at the knees for only $38.00. Styling them with a basic white tank and chunky sneakers gives off the ultimate effortless 90s off-duty vibe.
 ```
 
 ---
