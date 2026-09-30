@@ -119,11 +119,22 @@
 
 **One full query**
 
-<!-- Filled in once the loop in agent.py is built — Milestone 5. -->
-
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Pair the Y2K baby tee with your baggy straight-leg jeans and chunky
+  white sneakers for an effortless throwback streetwear look, finishing it off
+  with the black crossbody bag. To lean into a slightly edgy vintage aesthetic,
+  layer the cropped zip hoodie over the baby tee, and pair them with your baggy
+  straight-leg jeans and black combat boots.
+
+  Fit card: Found my new entire personality for $18 on depop! 🦋 This Y2K
+  butterfly baby tee gives the absolute best nostalgic streetwear energy.
+  Can't wait to live in this cropped little top all summer long.
+
+2 model calls this session, 498 prompt + 113 output tokens
 ```
 
 **The three tools, tested one at a time**

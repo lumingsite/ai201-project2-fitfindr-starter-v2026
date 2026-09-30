@@ -13,10 +13,55 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+_SIZE_RE = re.compile(r"\bsize\s+([A-Za-z0-9/.]+)", re.I)
+_PRICE_RE = re.compile(
+    r"under\s*\$\s*(\d+(?:\.\d{1,2})?)"
+    r"|\$\s*(\d+(?:\.\d{1,2})?)\s*or less",
+    re.I,
+)
+_FILLER_WORDS = {"in", "a", "an", "the", "for"}
+
+
+def _parse_query(query: str) -> dict:
+    """
+    Pull a size token and a max price out of the query with regex; whatever
+    text is left over (minus a few connector words) becomes the description.
+    """
+    size = None
+    max_price = None
+    spans = []
+
+    size_match = _SIZE_RE.search(query)
+    if size_match:
+        size = size_match.group(1)
+        spans.append(size_match.span())
+
+    price_match = _PRICE_RE.search(query)
+    if price_match:
+        price_text = price_match.group(1) or price_match.group(2)
+        max_price = float(price_text)
+        spans.append(price_match.span())
+
+    chars = list(query)
+    for start, end in spans:
+        for i in range(start, end):
+            chars[i] = " "
+    remainder = "".join(chars)
+
+    words = [w for w in remainder.split() if w.lower() not in _FILLER_WORDS]
+    description = " ".join(words)
+
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -107,8 +152,40 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    trace.check_iterations(1)
+
+    session["parsed"] = _parse_query(query)
+
+    session["search_results"] = search_listings(
+        description=session["parsed"]["description"],
+        size=session["parsed"]["size"],
+        max_price=session["parsed"]["max_price"],
+    )
+
+    # ── THE BRANCH ──
+    if not session["search_results"]:
+        changeable = []
+        if session["parsed"]["max_price"] is not None:
+            changeable.append("raising the price ceiling")
+        if session["parsed"]["size"] is not None:
+            changeable.append("trying a different size")
+        if not changeable:
+            changeable.append("using different or broader keywords")
+        session["error"] = (
+            "No listings matched your search. Try " + " or ".join(changeable) + "."
+        )
+        return session
+
+    session["selected_item"] = session["search_results"][0]
+
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
     return session
 
 
