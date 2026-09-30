@@ -39,9 +39,13 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+FitFindr is a command-line agent for a thrift/resale shopping assistant. A
+user types a plain-language request (e.g. `"vintage graphic tee under $30"`)
+and the agent searches a mock listings dataset, picks the best match, and
+asks the model for outfit ideas that combine the find with the user's saved
+wardrobe. It then turns that into a short, shareable caption for the item.
+If nothing in the data matches the request, the agent stops and tells the
+user what to change instead of pretending to find something.
 
 ---
 
@@ -104,7 +108,7 @@
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** Regex over the raw query string — one pattern pulls a size token (e.g. `\b(XS|S|M|L|XL|XXL|W?\d{2}(?:\s?L\d{2})?)\b`), another pulls a max price from `under $N` / `$N or less` phrasing, and whatever text remains (with those matched spans stripped) becomes `description`.
+**How the query is parsed:** Regex over the raw query string (`agent.py::_parse_query`) — `\bsize\s+([A-Za-z0-9/.]+)` pulls the token after the word "size" (e.g. "size M", "size 8"), `under\s*\$\s*(\d+(?:\.\d{1,2})?)` or `\$\s*(\d+(?:\.\d{1,2})?)\s*or less` pulls the price ceiling, and whatever text remains (with those matched spans blanked out, plus a few filler words like "in"/"the" dropped) becomes `description`.
 
 **What moves through the session:** `query` → `parsed` (description/size/max_price) → `search_results` → `selected_item` → `outfit_suggestion` → `fit_card`, with `error` set and the run stopped short the moment any step can't produce a usable next input.
 
@@ -185,15 +189,30 @@ Finally scored the holy grail of denim on Depop and I am never taking these off.
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Tested `create_fit_card` by running it three times on
+  the same item and reading the output myself, as the milestone asks.
+- *What came back:* All three runs came back word-for-word identical.
+- *What I changed:* Instead of assuming the tool was broken, I checked
+  `config.py` — `TEMPERATURE` is 0.9, not 0, so the repeat wasn't that. It was
+  `CACHE_ENABLED` handing back an already-cached answer for the identical
+  prompt. I reran the same test with `AI201_CACHE=0` and got three genuinely
+  different captions, which is what confirmed the tool itself works and the
+  first result was a caching artifact, not a bug.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Asked Claude to attack my draft acceptance criteria —
+  "tell me exactly how you'd test this using only what the sentence says,
+  don't suggest improvements."
+- *What came back:* For criterion 3 (state), my draft reason was "must be 5
+  of 5, otherwise the wrong item would reach the next tool." Claude pointed
+  out that was circular — it restated the criterion instead of explaining why
+  5 of 5 is a reasonable target rather than a stricter or looser one.
+- *What I changed:* I rewrote the reasoning to point at *why* the target is
+  achievable: passing the selected item through `session["selected_item"]` is
+  a deterministic assignment, not a model call, so there's no legitimate
+  source of variance — any mismatch could only be a bug, which is why it's
+  held to 5 of 5 rather than something looser like criterion 1.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
