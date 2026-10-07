@@ -351,13 +351,20 @@ model) still passes on that try:
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools, returns a fit card | 4 of 5 | MET (5/5) | All 5 tries of `python app.py ask 'vintage graphic tee under $30'` reached `create_fit_card` and returned a non-empty string (245–304 chars). Counted passes straight off `results/run_2026-10-07_1931_before.md`. |
+| 2 | Impossible query stops before `suggest_outfit` | 5 of 5 | MET (5/5) | All 5 tries of `designer ballgown size XXS under $5` had `search_results: 0`, a non-empty `session["error"]` naming what to change, and no `outfit_suggestion`. |
+| 3 | `selected_item` id matches the id passed to `suggest_outfit` | 5 of 5 | MET (5/5) | The printed log only shows a title, which isn't the id the criterion names, so I didn't call this from the log. I patched `agent.suggest_outfit` with a spy, ran `run_agent`, and compared `session["selected_item"]["id"]` to the id the spy actually received: `lst_004` both times. |
+| 4 | Fit card mentions price + platform (5 of 5); ≤1 of 10 opening-sentence pairs identical | 5 of 5, 9 of 10 | MET (5/5, 10/10) | Read all 5 cards (5 different items) by hand — every one names a dollar amount and a platform. Compared all 10 pairs of opening sentences for exact string matches; none matched, so 10/10 distinct, which clears the 9/10 bar with room to spare. |
+| 5 | `selected_item` price ≤ query's `max_price` | 5 of 5 | MET (5/5) | Query `silk slip dress in midi length under $40` parses to `max_price=40.0`; all 5 tries selected the $30.00 item, so $30 ≤ $40 held even on the try where the model itself returned a 503 afterward. |
 
 **Diagnoses**
+
+No misses this run — all five criteria held at or above target across all 5 tries. Two things worth flagging honestly rather than just taking the clean sheet at face value:
+
+- **Criterion 1's test doesn't exercise what its "why" paragraph worries about.** `criteria.md` justifies the 4-of-5 target by saying "some phrasings will miss" — but `scenarios.py` runs the *exact same query string* five times, so `search_listings` (a pure function of its inputs) gets identical input on every try and can only ever be all-pass or all-fail, never a mix. The 5/5 I got says the model calls behaved, not that the search tool tolerates varied phrasing. If I ran this again I'd use five *different* phrasings for the same target item (e.g. "80s/90s style t-shirt", "vintage printed tee", "retro graphic shirt") rather than repeating one string — that's a test-design fix, not a target change, since nothing here was unmeasurable, it was just measuring the wrong kind of variation.
+- **One transient model failure showed up (criterion 5, try 1 — a `503 UNAVAILABLE` from the service, not a bad key or a bug).** It didn't cost a point only because `selected_item` is chosen by `search_listings` *before* the model is ever called in `run_agent` — the failure landed downstream of what criterion 5 actually checks. That's the one place in this run where the "four places to fail" (tool / branch / session / model output) mattered: this was a model-output failure, caught cleanly by the Milestone 2 handler, and it happened to be irrelevant to the specific criterion it landed on. A criterion about the *outfit* or *fit card* text on that same try, if I'd had one keyed to this exact scenario, would have had a real FAIL to log instead.
+
+If I had to tighten one target given what I actually saw: criterion 3, at 5 of 5, is already as strict as it can be and is correctly justified (a deterministic assignment with no legitimate source of variance). Criterion 1's 4-of-5 is the one I'd leave *as a number* but fix in test design per above, rather than tighten or loosen it on the strength of a single clean run against an unrepresentative test.
 
 
 
