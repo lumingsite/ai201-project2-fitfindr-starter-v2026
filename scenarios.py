@@ -35,18 +35,55 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # Any normal completed run — criterion 3 checks that the id of
+        # selected_item matches what actually reached suggest_outfit.
+        "name": "state: selected item matches what's passed on",
+        "query": "90s track jacket in size M",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4 needs 5 fit cards for 5 DIFFERENT items, not the same
+        # item 5 times — these are 5 separate scenarios, each matching a
+        # distinct top listing (verified with tools.search_listings first).
+        "name": "fit card: item 1 (tee)",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        "name": "fit card: item 2 (track jacket)",
+        "query": "90s track jacket in size M",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        "name": "fit card: item 3 (slip dress)",
+        "query": "silk slip dress in midi length under $40",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        "name": "fit card: item 4 (sneakers)",
+        "query": "platform sneakers size 8",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        "name": "fit card: item 5 (denim jacket)",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Criterion 5: an explicit max_price, checked against selected_item's
+        # price. Deterministic — doesn't touch the model — so 5/5 is fair.
+        "name": "price ceiling respected",
+        "query": "silk slip dress in midi length under $40",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")
