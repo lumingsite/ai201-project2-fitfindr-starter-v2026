@@ -456,22 +456,63 @@ Not handled before this unit — `generate()` already raised `ModelUnavailable` 
 
 **What I changed:**
 
+`tools.py::create_fit_card`'s prompt now explicitly instructs the model to
+state the price as a numeral with a dollar sign ("$42", not "forty-two
+dollars" or "forty bucks"), with a one-line reason (a reader skimming the
+caption should be able to spot the price at a glance). One prompt, one line
+added.
+
 **Which failure it was meant to fix:**
+
+Milestone 4's diagnosis of criterion 4: on the before-run, the fit card for
+the silk slip dress said "thirty bucks" instead of a dollar figure. It still
+technically mentioned the price, so it didn't cost a point on that run — but
+it was the one card out of five that an automated check (or a user skimming
+for the number) could plausibly miss, and relying on the model to spell out
+numbers consistently in prose isn't something the prompt was actually asking
+for. The mechanism: the prompt said "mention... its price" without saying
+*how*, so the model was free to choose a format, and at temperature 0.9 it
+sometimes chose words over digits.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes all three tools, returns a fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. `selected_item` id matches the id passed to `suggest_outfit` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card mentions price + platform (Try N = item N); price always numeral | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. `selected_item` price ≤ query's `max_price` | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Full output: `results/run_2026-10-07_1944_after.md` (90 model calls, 24332
+prompt + 6745 output tokens).
+
+The five fit cards, one per item, all stating the price as a numeral this
+time:
+```
+Y2K Baby Tee:        "...was only $18.00 and has the absolute dreamiest..."
+90s Track Jacket:    "...off Poshmark for just $45 and I'm obsessed..."
+90s Silk Slip Dress: "...on Depop for just $30.00 and I am obsessed..."
+Platform Sneakers:   "...on Poshmark for just $48 and I am never taking..."
+Denim Jacket:        "...I just scored on Poshmark for $42.00! It's..."
+```
 
 **Did it help, and how do I know:**
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+Both before and after runs landed at MET (5/5) on every criterion, so this
+didn't flip any verdict from MISSED to MET — there was no miss to fix, only
+the one soft spot I'd flagged in Milestone 4. What changed concretely: the
+silk slip dress, which said "thirty bucks" on the before-run, said "$30.00"
+on the after-run (same item, same scenario, same temperature). That's a
+direct hit on the specific thing the prompt change targeted, confirmed by
+diffing the two run logs for that one scenario rather than by re-reading all
+50 tries. It's a small, single-scenario before/after rather than a criterion
+moving between MET and MISSED, which is the honest size of this fix — the
+underlying criterion was never failing on any of the 5 runs I captured, so
+proving this "helped" at the criterion level over a bigger sample would need
+more than 5 tries per item to say with confidence. What I can say cleanly is
+that the specific failure mode I diagnosed (price spelled out in words)
+did not reproduce after the change, on the same item that triggered it.
 
 
 
