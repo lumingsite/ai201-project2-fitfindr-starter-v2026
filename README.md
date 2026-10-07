@@ -296,21 +296,65 @@ that produced it:
 **Happy path**
 
 ```
-
+[1] parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] suggest_outfit
+      in:  dict with keys: item, wardrobe_items
+      out: Pair the Y2K baby tee with your baggy straight-leg jeans and chunky white sneakers for an effortless throwback…
+[4] create_fit_card
+      in:  dict with keys: outfit
+      out: Found my new entire personality for $18 on depop! 🦋 This Y2K butterfly baby tee gives the absolute best nostal…
 ```
 
 **Empty search**
 
 ```
-
+[1] parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch: empty_search
+      →    stopping before suggest_outfit
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** `search_listings` is now registered on `mcp_server.py` and
+`run_agent()` calls it through `mcp_client.call_tool("search_listings", {...})`
+instead of importing the function directly. The returned value is unchanged —
+same list of listing dicts, same ranking — which is why the happy-path output
+above matches what the direct call produced before. The only visible change is
+in the trace step name, labeled `search_listings (via MCP)` so the MCP hop is
+identifiable in the log.
 
 
+
+### Failure Modes Triggered
+
+**Empty search** — `python app.py ask 'designer ballgown size XXS under $5'`
+```
+No listings matched your search. Try raising the price ceiling or trying a different size.
+```
+Already handled before this unit — the branch in `run_agent()` stops before `suggest_outfit` and names what to change.
+
+**Empty wardrobe** — `python app.py ask 'retro windbreaker size L' --empty-wardrobe`
+```
+Outfit:   Pair this bold 90s windbreaker with relaxed-fit, light-wash denim or black
+joggers to keep the focus on the vibrant color blocking. Layer it over a simple
+white or grey graphic tee, and finish the look with classic retro sneakers like
+white chunky trainers or Nike Dunks.
+```
+Already handled — `suggest_outfit` checks `wardrobe['items']` and switches to a general-advice prompt when it's empty. General styling advice, not a crash, not `""`.
+
+**Model unavailable** — one character of `GEMINI_API_KEY` in `.env` changed, then `python app.py ask 'oversized denim shirt size M' --trace`
+```
+The model could not be reached, so no outfit or fit card could be generated: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+```
+Not handled before this unit — `generate()` already raised `ModelUnavailable` with a readable message, but `run_agent()` didn't catch it, so it reached `app.py`'s top-level handler as `ModelUnavailable: <message>` and exited. Added a `try/except ModelUnavailable` around the two model-calling steps in `run_agent()` that sets `session["error"]` instead, so the failure comes back through the same session shape as the other two branches rather than killing the process. Key restored afterward; confirmed with `python test.py`.
 
 ---
 

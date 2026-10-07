@@ -156,12 +156,18 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     trace.check_iterations(1)
 
     session["parsed"] = _parse_query(query)
+    trace.step("parse_query", inputs=query, returned=session["parsed"])
 
     session["search_results"] = call_tool("search_listings", {
         "description": session["parsed"]["description"],
         "size": session["parsed"]["size"],
         "max_price": session["parsed"]["max_price"],
     })
+    trace.step(
+        "search_listings (via MCP)",
+        inputs=session["parsed"],
+        returned=session["search_results"],
+    )
 
     # ── THE BRANCH ──
     if not session["search_results"]:
@@ -175,17 +181,36 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         session["error"] = (
             "No listings matched your search. Try " + " or ".join(changeable) + "."
         )
+        trace.step("branch: empty_search", note="stopping before suggest_outfit")
         return session
 
     session["selected_item"] = session["search_results"][0]
 
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"], session["wardrobe"]
-    )
+    try:
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"], session["wardrobe"]
+        )
+        trace.step(
+            "suggest_outfit",
+            inputs={"item": session["selected_item"]["title"],
+                    "wardrobe_items": len(session["wardrobe"].get("items", []))},
+            returned=session["outfit_suggestion"],
+        )
 
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
-    )
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"], session["selected_item"]
+        )
+        trace.step(
+            "create_fit_card",
+            inputs={"outfit": session["outfit_suggestion"]},
+            returned=session["fit_card"],
+        )
+    except ModelUnavailable as exc:
+        session["error"] = (
+            f"The model could not be reached, so no outfit or fit card could "
+            f"be generated: {exc}"
+        )
+        trace.step("model_call", note=f"ModelUnavailable: {exc}")
 
     return session
 
