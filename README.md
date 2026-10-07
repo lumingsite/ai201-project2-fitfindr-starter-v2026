@@ -214,6 +214,35 @@ Finally scored the holy grail of denim on Depop and I am never taking these off.
   source of variance — any mismatch could only be a bug, which is why it's
   held to 5 of 5 rather than something looser like criterion 1.
 
+**Moment 3**
+
+- *What I asked for:* Had Claude call MET/MISSED on all five criteria from
+  the actual run_eval.py output, with instructions not to take a clean sheet
+  at face value if everything happened to pass.
+- *What came back:* All five criteria were genuinely MET, 5/5 — but Claude
+  pointed out that `scenarios.py`'s criterion-1 scenario reruns the *same*
+  query string five times, so it can only ever test whether the model calls
+  behaved, never the search-phrasing risk that `criteria.md` actually cites
+  as the reason the target is 4-of-5 rather than 5-of-5.
+- *What I changed:* I did not rewrite the scenario this unit (see What's
+  Still Broken — it's a second change, and Milestone 5 asked for one), but I
+  wrote the gap down explicitly instead of letting "5/5, MET" stand as if it
+  had proven more than it did.
+
+**Moment 4**
+
+- *What I asked for:* Asked Claude to pick exactly one thing from the
+  diagnosis above and fix it, not a bundle of related cleanups.
+- *What came back:* It picked the one concrete, reproducible defect in the
+  diagnosis — the silk slip dress fit card wrote "thirty bucks" instead of a
+  dollar figure, because the `create_fit_card` prompt said to mention the
+  price without saying what format to use.
+- *What I changed:* Added one sentence to that prompt requiring a numeral
+  price, reran all 50 tries with caching off, and confirmed the same item,
+  same scenario now reads "$30.00" instead of "thirty bucks" — a direct,
+  checkable before/after on the specific thing that was diagnosed, rather
+  than a vague "it should be better now."
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -520,9 +549,35 @@ did not reproduce after the change, on the same item that triggered it.
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No criterion was MISSED on either the before-run or the after-run — all five
+held at or above target both times. That is not the same as nothing being
+left, so here is what I did not fix and why.
+
+- **Criterion 1's test still does not test what it claims to.** Both runs
+  reused the identical query string (`vintage graphic tee under $30`) across
+  all 5 tries. `search_listings` is a pure function of its inputs, so that
+  can only ever come back all-pass or all-fail — it never actually exercises
+  the "some phrasings will miss" risk that `criteria.md` gives as the reason
+  for a 4-of-5 (rather than 5-of-5) target. I named the fix in Milestone 4
+  (five different phrasings for the same target item, not five repeats) but
+  did not implement it this unit — doing it properly means extending
+  `scenarios.py` and `run_eval.py` to support a per-scenario list of queries
+  instead of one, which is a second change on top of the one I already made
+  for Milestone 5, and the milestone is explicit that one change is the
+  point. I stopped there on purpose, not because I ran out of time.
+
+- **The numeral-price prompt instruction is not enforced, only requested.**
+  Milestone 5's fix told the model to always write the price as a numeral.
+  It worked on the one item that had shown the problem (`thirty bucks` →
+  `$30.00`), but at `TEMPERATURE = 0.9` nothing stops the model from spelling
+  out a price on some other item or some other try — I only reran 5 tries
+  per item, not enough to rule that out. The sturdier fix is a regex check
+  in `create_fit_card` that verifies a `$` + digit pattern is present before
+  returning, and asks the model again (or falls back to appending the price
+  plainly) if it is not. I did not add that this unit, because it is a
+  second, different kind of change (a code guard, not a prompt edit) and
+  Milestone 5 asked for one change, measured properly — not a prompt tweak
+  plus a safety net behind it.
 
 
 
